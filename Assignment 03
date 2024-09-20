@@ -1,0 +1,143 @@
+# Server Side Code
+import socket
+import threading
+import time
+import random
+from datetime import datetime
+
+# Server Information
+SERVER_IP = '127.0.0.1'
+PORT = 12345
+ADDRESS = (SERVER_IP, PORT)
+
+# Global dictionary to store registered clients
+clients = {}
+clients_lock = threading.Lock()
+
+# Log files for server
+LOG_FILE = "server_log.txt"
+
+# Function to log messages to file
+def log_message(message):
+    with open(LOG_FILE, 'a') as f:
+        f.write(f"{message}\n")
+
+# Server to handle registration and unregistration of clients
+def handle_client_connection(conn, addr):
+    while True:
+        try:
+            message = conn.recv(1024).decode('utf-8')
+            if message.startswith('R'):
+                # Register client
+                client_id = int(message.split()[1])
+                with clients_lock:
+                    clients[client_id] = addr
+                log_message(f"Client {client_id} registered from {addr}")
+                conn.send(f"Client {client_id} registered successfully.".encode('utf-8'))
+
+            elif message.startswith('U'):
+                # Unregister client
+                client_id = int(message.split()[1])
+                with clients_lock:
+                    if client_id in clients:
+                        del clients[client_id]
+                log_message(f"Client {client_id} unregistered")
+                conn.send(f"Client {client_id} unregistered successfully.".encode('utf-8'))
+
+        except:
+            break
+    conn.close()
+
+# Function to send timestamp to all registered clients
+def send_timestamp_to_clients():
+    while True:
+        time.sleep(random.randint(5, 30))  # Random interval
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        with clients_lock:
+            for client_id, client_addr in clients.items():
+                try:
+                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                        s.connect(client_addr)
+                        s.send(f"Timestamp: {timestamp}".encode('utf-8'))
+                        log_message(f"Sent timestamp to client {client_id} at {client_addr}")
+                except:
+                    log_message(f"Failed to send timestamp to client {client_id} at {client_addr}")
+
+# Main server function to accept new clients
+def start_server():
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind(ADDRESS)
+    server.listen(5)
+    print(f"Server listening on {ADDRESS}")
+
+    # Thread to periodically send timestamps
+    threading.Thread(target=send_timestamp_to_clients, daemon=True).start()
+
+    while True:
+        conn, addr = server.accept()
+        print(f"Connection from {addr}")
+        threading.Thread(target=handle_client_connection, args=(conn, addr), daemon=True).start()
+
+if __name__ == "__main__":
+    start_server()
+
+
+# Client Side Code
+import socket
+import threading
+import time
+import random
+from datetime import datetime
+
+# Client Information
+SERVER_IP = '127.0.0.1'
+PORT = 12345
+SERVER_ADDRESS = (SERVER_IP, PORT)
+
+# Log file for client received messages
+CLIENT_LOG_FILE = "client_log.txt"
+
+# Function to log received messages to a file
+def log_client_message(message):
+    with open(CLIENT_LOG_FILE, 'a') as f:
+        f.write(f"{message}\n")
+
+# Function to register client, listen for messages, and unregister client
+def client_routine(client_id):
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
+            client_socket.connect(SERVER_ADDRESS)
+            
+            # Register client
+            register_message = f"R {client_id}"
+            client_socket.send(register_message.encode('utf-8'))
+            response = client_socket.recv(1024).decode('utf-8')
+            print(response)
+            log_client_message(f"Registered: {response}")
+
+            # Listen for timestamp messages with an exponential delay
+            exponential_delay = random.uniform(15, 90)
+            start_time = time.time()
+            while time.time() - start_time < exponential_delay:
+                try:
+                    client_socket.settimeout(5)
+                    message = client_socket.recv(1024).decode('utf-8')
+                    if message:
+                        log_client_message(f"Received: {message}")
+                except socket.timeout:
+                    continue
+
+            # Unregister client
+            unregister_message = f"U {client_id}"
+            client_socket.send(unregister_message.encode('utf-8'))
+            response = client_socket.recv(1024).decode('utf-8')
+            print(response)
+            log_client_message(f"Unregistered: {response}")
+    
+    except Exception as e:
+        print(f"Error: {e}")
+
+# Main function to run the client
+if __name__ == "__main__":
+    client_id = random.randint(1, 100)
+    client_routine(client_id)
