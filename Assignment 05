@@ -1,0 +1,51 @@
+import requests
+
+def get_request(url):
+    """Makes a GET request to the provided URL and displays the data."""
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # Check if the request was successful
+        # Assuming the response contains JSON data
+        data = response.json()
+        print("\nGET Request successful! Retrieved data:")
+        # Display titles of the posts (specific to the placeholder API)
+        for post in data[:5]:  # Display only the first 5 posts
+            print(f"Post ID: {post['id']}, Title: {post['title']}")
+    except requests.exceptions.HTTPError as http_err:
+        print(f"HTTP error occurred: {http_err}")
+    except Exception as err:
+        print(f"An error occurred: {err}")
+
+def post_request(url, payload):
+    """Makes a POST request to the provided URL with mock data and displays the response."""
+    try:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()  # Check if the request was successful
+        print("\nPOST Request successful! Server responded with:")
+        print(response.json())  # Assuming the response is in JSON format
+    except requests.exceptions.HTTPError as http_err:
+        print(f"HTTP error occurred: {http_err}")
+    except Exception as err:
+        print(f"An error occurred: {err}")
+
+def main():
+    # URL for testing GET and POST requests (public API)
+    get_url = "https://jsonplaceholder.typicode.com/posts"
+    post_url = "https://jsonplaceholder.typicode.com/posts"
+
+    # Step 1: Make a GET request
+    print("Making a GET request...")
+    get_request(get_url)
+
+    # Step 2: Make a POST request with mock data
+    print("\nMaking a POST request...")
+    mock_data = {
+        "title": "Sample Post",
+        "body": "This is a test post body.",
+        "userId": 1
+    }
+    post_request(post_url, mock_data)
+
+if __name__ == "__main__":
+    main()
+
